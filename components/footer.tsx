@@ -1,7 +1,7 @@
 "use client"
 
 import { motion } from "framer-motion"
-import { Shield, Github, ExternalLink } from "lucide-react"
+import { Shield, Github } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 export function Footer() {
@@ -39,16 +39,6 @@ export function Footer() {
                   aria-label="GitHub"
                 >
                   <Github className="h-4 w-4" />
-                </a>
-              </Button>
-              <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
-                <a
-                  href="https://vercel.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="Vercel"
-                >
-                  <ExternalLink className="h-4 w-4" />
                 </a>
               </Button>
             </div>
