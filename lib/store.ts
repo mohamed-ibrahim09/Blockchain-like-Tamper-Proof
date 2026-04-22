@@ -61,6 +61,8 @@ export function addEncryptionKey(
     key?: string
     publicKey?: { e: number; n: number }
     privateKey?: { d: number; n: number }
+    p?: number
+    q?: number
     vigenereKey?: string
     playfairKey?: string
   }
@@ -71,12 +73,15 @@ export function addEncryptionKey(
     key: keyData.key || "",
     publicKey: keyData.publicKey,
     privateKey: keyData.privateKey,
+    p: keyData.p,
+    q: keyData.q,
     vigenereKey: keyData.vigenereKey,
     playfairKey: keyData.playfairKey,
     timestamp: new Date(),
     encryptedDataPreview: encryptedData.substring(0, 50) + (encryptedData.length > 50 ? "..." : ""),
+    encryptedData: encryptedData,
   }
-  
+
   encryptionKeys = [entry, ...encryptionKeys].slice(0, 100)
   notifyKeyListeners()
   return entry

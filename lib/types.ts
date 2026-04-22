@@ -6,8 +6,14 @@ export interface EncryptionResult {
   output_size: number
   throughput: number
   public_key?: { e: number; n: number }
+  private_key?: { d: number; n: number }
+  p?: number                 // RSA prime factor p
+  q?: number                 // RSA prime factor q
   fastest?: boolean
   most_efficient?: boolean
+  key_used?: string          // for Playfair/Vigenere, returned by backend
+  vigenere_key?: string      // for Hybrid mode
+  playfair_key?: string      // for Hybrid mode
 }
 
 export interface RunAllResponse {
@@ -57,13 +63,16 @@ export type Algorithm = "rsa" | "playfair" | "vigenere" | "hybrid"
 export interface EncryptionKey {
   id: string
   algorithm: string
-  key: string
-  publicKey?: { e: number; n: number }
-  privateKey?: { d: number; n: number }
+  key: string                          // Generic key (for Playfair/Vigenere)
+  publicKey?: { e: number; n: number } // RSA public key
+  privateKey?: { d: number; n: number } // RSA private key
+  p?: number                           // RSA prime p
+  q?: number                           // RSA prime q
   vigenereKey?: string
   playfairKey?: string
   timestamp: Date
   encryptedDataPreview: string
+  encryptedData: string               // Full encrypted data reference
 }
 
 export interface DecryptionResult {

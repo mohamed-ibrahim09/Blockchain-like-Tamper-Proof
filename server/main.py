@@ -1,3 +1,4 @@
+import os
 from flask import Flask
 from flask_cors import CORS
 from app.routes import encryption_routes, blockchain_routes
@@ -8,7 +9,8 @@ def create_app():
     app = Flask(__name__)
     
     # Enable CORS for all routes
-    CORS(app, origins=["http://localhost:3000", "http://localhost:5173"])
+    cors_origins = os.environ.get("CORS_ORIGINS", "*").split(",")
+    CORS(app, origins=cors_origins if cors_origins[0] != "*" else "*")
     
     # Register blueprints
     app.register_blueprint(encryption_routes.bp, url_prefix="/api")

@@ -17,7 +17,7 @@ import { DecryptSection } from "@/components/decrypt-section"
 import { AnimatedBackground } from "@/components/animated-background"
 import { Footer } from "@/components/footer"
 import { useTimer } from "@/hooks/use-timer"
-import { encryptData, runAllAlgorithms, addBlock } from "@/lib/api"
+import { encryptData, runAllAlgorithms, addBlock, EncryptOptions } from "@/lib/api"
 import { addToHistory, addEncryptionKey } from "@/lib/store"
 import type { EncryptionResult, Algorithm } from "@/lib/types"
 
@@ -43,7 +43,7 @@ export default function Home() {
   }, [])
 
   const handleEncrypt = useCallback(
-    async (algorithm: Algorithm) => {
+    async (algorithm: Algorithm, options: EncryptOptions) => {
       if (!inputText.trim()) {
         toast.error("Please enter some text to encrypt")
         return
@@ -53,20 +53,26 @@ export default function Home() {
       timer.start()
 
       try {
-        const result = await encryptData(inputText, algorithm) as EncryptionResult & { keyData?: { key?: string; publicKey?: { e: number; n: number }; privateKey?: { d: number; n: number }; vigenereKey?: string; playfairKey?: string } }
+        const result = await encryptData(inputText, algorithm, options) as EncryptionResult
         timer.stop()
         setResults([result])
         setLatestEncryption(result.encrypted_data)
         addToHistory(inputText, result)
-        
+
         // Store the encryption key for decryption
-        if (result.keyData) {
-          addEncryptionKey(algorithm, result.encrypted_data, result.keyData)
-        }
-        
+        addEncryptionKey(algorithm, result.encrypted_data, {
+          key: result.key_used || (algorithm === "rsa" ? "RSA Key" : algorithm === "hybrid" ? "Hybrid Key" : ""),
+          publicKey: result.public_key,
+          privateKey: result.private_key,
+          p: result.p,
+          q: result.q,
+          vigenereKey: result.vigenere_key,
+          playfairKey: result.playfair_key,
+        })
+
         // Auto-add to blockchain
         await autoAddToBlockchain(result.encrypted_data, result.algorithm)
-        
+
         toast.success(`Encrypted with ${result.algorithm} in ${result.execution_time.toFixed(2)}ms`)
       } catch (error) {
         timer.stop()
@@ -106,10 +112,16 @@ export default function Home() {
       // Add all results to history and store keys
       response.results.forEach((result) => {
         addToHistory(inputText, result)
-        const resultWithKey = result as EncryptionResult & { keyData?: { key?: string; publicKey?: { e: number; n: number }; privateKey?: { d: number; n: number }; vigenereKey?: string; playfairKey?: string } }
-        if (resultWithKey.keyData) {
-          addEncryptionKey(result.algorithm.toLowerCase(), result.encrypted_data, resultWithKey.keyData)
-        }
+        // Store all key data from the result
+        addEncryptionKey(result.algorithm.toLowerCase(), result.encrypted_data, {
+          key: result.key_used || (result.algorithm.toLowerCase() === "rsa" ? "RSA Key" : result.algorithm.toLowerCase() === "hybrid" ? "Hybrid Key" : ""),
+          publicKey: result.public_key,
+          privateKey: result.private_key,
+          p: result.p,
+          q: result.q,
+          vigenereKey: result.vigenere_key,
+          playfairKey: result.playfair_key,
+        })
       })
 
       const fastest = response.results.find((r) => r.fastest)

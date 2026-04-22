@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
 import {
   Tooltip,
@@ -15,9 +16,16 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import type { Algorithm } from "@/lib/types"
+import type { EncryptOptions } from "@/lib/api"
+
+export interface EncryptionOptions {
+  key: string
+  p: string
+  q: string
+}
 
 interface EncryptionPanelProps {
-  onEncrypt: (algorithm: Algorithm) => Promise<void>
+  onEncrypt: (algorithm: Algorithm, options: EncryptOptions) => Promise<void>
   onRunAll: () => Promise<void>
   isLoading: boolean
   disabled: boolean
@@ -28,25 +36,25 @@ const algorithms: { id: Algorithm; name: string; icon: typeof Lock; description:
     id: "rsa",
     name: "RSA",
     icon: Key,
-    description: "Asymmetric encryption using public/private key pairs. Most secure but slower.",
+    description: "Asymmetric encryption using public/private key pairs. Enter primes P and Q, or leave blank for auto-generation.",
   },
   {
     id: "playfair",
     name: "Playfair",
     icon: Shield,
-    description: "Classical cipher using a 5x5 matrix. Fast with moderate security.",
+    description: "Classical cipher using a 5x5 matrix. Enter a key or use the default.",
   },
   {
     id: "vigenere",
     name: "Vigenere",
     icon: Lock,
-    description: "Polyalphabetic cipher using a keyword. Fastest with basic security.",
+    description: "Polyalphabetic cipher using a keyword. Enter a key or use the default.",
   },
   {
     id: "hybrid",
     name: "Hybrid Mode",
     icon: Layers,
-    description: "Ultimate security! Combines RSA + Playfair + Vigenere for maximum protection. Best results guaranteed.",
+    description: "Ultimate security! Combines RSA + Playfair + Vigenere. Enter key and optionally P/Q for RSA layer.",
     isHybrid: true,
   },
 ]
@@ -58,6 +66,31 @@ export function EncryptionPanel({
   disabled,
 }: EncryptionPanelProps) {
   const [selectedAlgorithm, setSelectedAlgorithm] = useState<Algorithm>("rsa")
+  const [key, setKey] = useState("")
+  const [p, setP] = useState("")
+  const [q, setQ] = useState("")
+
+  const handleEncrypt = () => {
+    const options: EncryptOptions = {}
+
+    if (key.trim()) {
+      options.key = key.trim()
+    }
+
+    // Add P and Q for RSA or Hybrid
+    if (selectedAlgorithm === "rsa" || selectedAlgorithm === "hybrid") {
+      if (p.trim() && q.trim()) {
+        const pNum = parseInt(p.trim())
+        const qNum = parseInt(q.trim())
+        if (!isNaN(pNum) && !isNaN(qNum)) {
+          options.p = pNum
+          options.q = qNum
+        }
+      }
+    }
+
+    onEncrypt(selectedAlgorithm, options)
+  }
 
   return (
     <motion.div
@@ -140,9 +173,82 @@ export function EncryptionPanel({
             </RadioGroup>
           </div>
 
+          {/* Key Input Section */}
+          <div className="space-y-4 border-t border-border pt-4">
+            {/* Key Input for Playfair, Vigenere, Hybrid */}
+            {(selectedAlgorithm === "playfair" || selectedAlgorithm === "vigenere" || selectedAlgorithm === "hybrid") && (
+              <div className="space-y-2">
+                <Label htmlFor="encryption-key" className="text-sm font-medium">
+                  Encryption Key {selectedAlgorithm !== "hybrid" && "(optional)"}
+                  {selectedAlgorithm === "hybrid" && <span className="text-red-400 ml-1">*</span>}
+                </Label>
+                <Input
+                  id="encryption-key"
+                  type="text"
+                  placeholder={
+                    selectedAlgorithm === "playfair"
+                      ? "Enter key (default: BLOCKCHAIN)"
+                      : selectedAlgorithm === "vigenere"
+                      ? "Enter key (default: TAMPERPROOF)"
+                      : "Enter key for Vigenere/Playfair layers"
+                  }
+                  value={key}
+                  onChange={(e) => setKey(e.target.value)}
+                  className="font-mono"
+                />
+                <p className="text-xs text-muted-foreground">
+                  {selectedAlgorithm === "playfair" && "Key must contain only letters. J is replaced with I."}
+                  {selectedAlgorithm === "vigenere" && "Key is case-insensitive and repeated as needed."}
+                  {selectedAlgorithm === "hybrid" && "This key is used for both Vigenere and Playfair layers."}
+                </p>
+              </div>
+            )}
+
+            {/* P and Q Input for RSA and Hybrid */}
+            {(selectedAlgorithm === "rsa" || selectedAlgorithm === "hybrid") && (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="prime-p" className="text-sm font-medium">
+                    Prime P <span className="text-muted-foreground">(optional)</span>
+                  </Label>
+                  <Input
+                    id="prime-p"
+                    type="number"
+                    placeholder="e.g., 61"
+                    value={p}
+                    onChange={(e) => setP(e.target.value)}
+                    className="font-mono"
+                    min="2"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="prime-q" className="text-sm font-medium">
+                    Prime Q <span className="text-muted-foreground">(optional)</span>
+                  </Label>
+                  <Input
+                    id="prime-q"
+                    type="number"
+                    placeholder="e.g., 53"
+                    value={q}
+                    onChange={(e) => setQ(e.target.value)}
+                    className="font-mono"
+                    min="2"
+                  />
+                </div>
+              </div>
+            )}
+
+            {(selectedAlgorithm === "rsa" || selectedAlgorithm === "hybrid") && (
+              <p className="text-xs text-muted-foreground">
+                Leave P and Q blank for automatic prime generation, or enter two distinct prime numbers.
+                Smaller primes (e.g., 61, 53) work best for text encryption.
+              </p>
+            )}
+          </div>
+
           <div className="flex flex-col gap-3">
             <Button
-              onClick={() => onEncrypt(selectedAlgorithm)}
+              onClick={handleEncrypt}
               disabled={disabled || isLoading}
               className={`w-full gap-2 font-semibold transition-all ${
                 selectedAlgorithm === "hybrid"

@@ -10,7 +10,7 @@ import type {
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
 
 // Flag to use mock data when backend is not available
-const USE_MOCK = true
+const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === "true" || false
 
 // Storage for encryption keys (for decryption)
 interface StoredKey {
@@ -18,6 +18,8 @@ interface StoredKey {
   key: string
   publicKey?: { e: number; n: number }
   privateKey?: { d: number; n: number }
+  p?: number
+  q?: number
   vigenereKey?: string
   playfairKey?: string
 }
@@ -42,11 +44,15 @@ function generateMockEncryption(text: string, algorithm: string): EncryptionResu
         .split("")
         .map((c) => Math.floor(Math.random() * 10000000))
         .join(",")
+      const p_r = 61  // Mock prime p
+      const q_r = 53  // Mock prime q
       keyData = {
         algorithm: "rsa",
         key: "RSA-2048",
-        publicKey: { e: 65537, n: Math.floor(Math.random() * 1000000000) },
-        privateKey: { d: Math.floor(Math.random() * 1000000000), n: Math.floor(Math.random() * 1000000000) },
+        publicKey: { e: 65537, n: p_r * q_r },
+        privateKey: { d: 2753, n: p_r * q_r },
+        p: p_r,
+        q: q_r,
       }
       break
     case "playfair":
@@ -104,13 +110,17 @@ function generateMockEncryption(text: string, algorithm: string): EncryptionResu
         .map((c) => Math.floor(Math.random() * 10000000))
         .join("-")
       
+      const p_h = 61
+      const q_h = 53
       keyData = {
         algorithm: "hybrid",
         key: "HYBRID-V1",
         vigenereKey: hybridVigKey,
         playfairKey: hybridPlayKey,
-        publicKey: { e: 65537, n: Math.floor(Math.random() * 1000000000) },
-        privateKey: { d: Math.floor(Math.random() * 1000000000), n: Math.floor(Math.random() * 1000000000) },
+        publicKey: { e: 65537, n: p_h * q_h },
+        privateKey: { d: 2753, n: p_h * q_h },
+        p: p_h,
+        q: q_h,
       }
       break
     default:
@@ -153,9 +163,16 @@ function generateHash(): string {
     .join("")
 }
 
+export interface EncryptOptions {
+  key?: string
+  p?: number
+  q?: number
+}
+
 export async function encryptData(
   text: string,
-  algorithm: string
+  algorithm: string,
+  options?: EncryptOptions
 ): Promise<EncryptionResult> {
   if (USE_MOCK) {
     await new Promise((r) => setTimeout(r, 100 + Math.random() * 200))
@@ -165,7 +182,7 @@ export async function encryptData(
   const response = await fetch(`${API_BASE_URL}/encrypt`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, algorithm }),
+    body: JSON.stringify({ text, algorithm, ...options }),
   })
   
   if (!response.ok) {
@@ -290,11 +307,19 @@ export function resetMockChain() {
   ]
 }
 
+export interface DecryptOptions {
+  key?: string
+  p?: number
+  q?: number
+  d?: number
+  n?: number
+}
+
 // Decryption function
 export async function decryptData(
   encryptedData: string,
   algorithm: string,
-  key: string
+  options: DecryptOptions
 ): Promise<DecryptionResult> {
   if (USE_MOCK) {
     await new Promise((r) => setTimeout(r, 100 + Math.random() * 200))
@@ -325,12 +350,13 @@ export async function decryptData(
         break
       case "vigenere":
         // Reverse vigenere cipher
+        const vigenereKey = options.key || "TAMPERPROOF"
         decrypted_data = encryptedData
           .split("")
           .map((c, i) => {
             if (c.match(/[a-zA-Z]/)) {
               const base = c.charCodeAt(0) < 97 ? 65 : 97
-              const shift = key.toUpperCase().charCodeAt(i % key.length) - 65
+              const shift = vigenereKey.toUpperCase().charCodeAt(i % vigenereKey.length) - 65
               return String.fromCharCode(((c.charCodeAt(0) - base - shift + 26) % 26) + base)
             }
             return c
@@ -350,8 +376,10 @@ export async function decryptData(
     
     const endTime = performance.now()
     
+    const formattedAlgorithm = algorithm.charAt(0).toUpperCase() + algorithm.slice(1)
+    
     return {
-      algorithm: algorithm.charAt(0).toUpperCase() + algorithm.slice(1),
+      algorithm: formattedAlgorithm,
       decrypted_data,
       execution_time: Math.round((endTime - startTime) * 100) / 100,
     }
@@ -360,7 +388,7 @@ export async function decryptData(
   const response = await fetch(`${API_BASE_URL}/decrypt`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ encrypted_data: encryptedData, algorithm, key }),
+    body: JSON.stringify({ encrypted_data: encryptedData, algorithm, ...options }),
   })
   
   if (!response.ok) {
