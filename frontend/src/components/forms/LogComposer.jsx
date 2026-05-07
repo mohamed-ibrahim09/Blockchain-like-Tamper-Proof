@@ -234,12 +234,12 @@ export function LogComposer() {
                   <span className="field-label">Key</span>
                   <span className="field-help">Required to encrypt and decrypt the message.</span>
                   <input
-                    placeholder="Enter the required key"
+                    placeholder={["vigenere", "playfair"].includes(formState.algorithm) ? "Enter the required key" : "Optional for this algorithm"}
                     value={formState.key}
                     onChange={(event) =>
                       setFormState((current) => ({ ...current, key: event.target.value }))
                     }
-                    required
+                    required={["vigenere", "playfair"].includes(formState.algorithm)}
                   />
                 </motion.label>
               )}

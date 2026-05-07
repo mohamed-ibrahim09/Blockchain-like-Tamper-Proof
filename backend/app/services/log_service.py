@@ -5,7 +5,8 @@ from typing import Any
 
 from app.core.config import settings
 from app.schemas.logs import ChainVerificationResponse, VerificationBlockResult
-from app.services.crypto_service import CryptoServiceError, crypto_service
+from app.services.crypto_service import CryptoService, CryptoServiceError, crypto_service
+from app.services.crypto_signatures import ensure_signing_key_exists, sign_block
 from app.services.file_storage import (
     StorageCorruptionError,
     append_log_record,
@@ -39,6 +40,9 @@ def _record_to_response(record: dict[str, Any]) -> dict[str, Any]:
         "tamper_note": record.get("tamper_note"),
         "created_at": datetime.fromisoformat(record["created_at"]),
         "updated_at": datetime.fromisoformat(record["updated_at"]),
+        "created_by_user_id": record.get("created_by_user_id"),
+        "created_by_username": record.get("created_by_username"),
+        "signature": record.get("signature"),
     }
 
 
@@ -63,6 +67,8 @@ def create_log(
     algorithm: str,
     key: str | None,
     hybrid_steps: list[dict[str, str]] | None,
+    created_by_user_id: int | None = None,
+    created_by_username: str | None = None,
 ) -> dict[str, Any]:
     records = read_log_records()
     previous_record = records[-1] if records else None
@@ -114,7 +120,15 @@ def create_log(
         "tamper_note": None,
         "created_at": created_at.isoformat(),
         "updated_at": created_at.isoformat(),
+        "created_by_user_id": created_by_user_id,
+        "created_by_username": created_by_username,
     }
+    
+    # Sign the block with ECDSA
+    ensure_signing_key_exists()
+    signature_data = sign_block(record)
+    record["signature"] = signature_data
+    
     append_log_record(record)
     verify_chain(write_warning=True)
     return record

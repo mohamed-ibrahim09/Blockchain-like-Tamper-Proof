@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { ChevronDown, KeyRound, ShieldAlert } from "lucide-react";
+import { ChevronDown, KeyRound, ShieldAlert, User, ShieldCheck } from "lucide-react";
 
-import { decryptLog, tamperLog } from "../../lib/api";
+import { decryptLog, tamperLog, verifyBlockSignature } from "../../lib/api";
 import { formatDate, getAlgorithmLabel, getStatusTone, shortenHash } from "../../lib/formatters";
+import { MerkleProofPanel } from "../crypto/MerkleProofPanel";
 import { StatusPill } from "../ui/StatusPill";
 
 export function BlockCard({ log, verification, expanded = false, onExpandedChange }) {
@@ -12,6 +13,7 @@ export function BlockCard({ log, verification, expanded = false, onExpandedChang
   const [tamperValue, setTamperValue] = useState("");
   const [decryptKey, setDecryptKey] = useState("");
   const [decryptionResult, setDecryptionResult] = useState(null);
+  const [signatureStatus, setSignatureStatus] = useState(null);
 
   const tamperMutation = useMutation({
     mutationFn: (payload) => tamperLog(log.id, payload),
@@ -31,6 +33,11 @@ export function BlockCard({ log, verification, expanded = false, onExpandedChang
     onSuccess: (data) => setDecryptionResult(data),
   });
 
+  const verifySigMutation = useMutation({
+    mutationFn: () => verifyBlockSignature(log.id),
+    onSuccess: (data) => setSignatureStatus(data),
+  });
+
   const status = verification?.status || (log.tampered ? "tampered" : "valid");
   const statusTone = getStatusTone(status);
 
@@ -46,9 +53,23 @@ export function BlockCard({ log, verification, expanded = false, onExpandedChang
           <div className="block-badges">
             <StatusPill tone={statusTone}>{status.toUpperCase()}</StatusPill>
             <StatusPill tone="neutral">{getAlgorithmLabel(log.algorithm)}</StatusPill>
+            {log.signature && (
+              <StatusPill tone="success" title="Block is digitally signed (ECDSA P-256)">
+                <ShieldCheck size={12} style={{ display: "inline", marginRight: "0.25rem" }} />
+                Signed
+              </StatusPill>
+            )}
           </div>
           <h3>Block #{log.id}</h3>
-          <p className="support-copy">{formatDate(log.created_at)}</p>
+          <p className="support-copy">
+            {formatDate(log.created_at)}
+            {log.created_by_username && (
+              <span style={{ marginLeft: "0.75rem", display: "inline-flex", alignItems: "center", gap: "0.25rem", color: "var(--accent)" }}>
+                <User size={12} />
+                {log.created_by_username}
+              </span>
+            )}
+          </p>
         </div>
 
         <button
@@ -110,7 +131,15 @@ export function BlockCard({ log, verification, expanded = false, onExpandedChang
 
           <div className="detail-grid">
             <div className="detail-card">
-              <p className="label-muted">Key metadata</p>
+              <p className="label-muted">
+                Encryption metadata
+                {log.created_by_username && (
+                  <span style={{ float: "right", display: "inline-flex", alignItems: "center", gap: "0.3rem", fontSize: "0.78rem", color: "var(--accent)", fontFamily: "inherit" }}>
+                    <User size={11} />
+                    Created by <strong>{log.created_by_username}</strong>
+                  </span>
+                )}
+              </p>
               <div className="mono-block">{JSON.stringify(log.key_metadata, null, 2)}</div>
             </div>
             <div className="detail-card">
@@ -210,6 +239,41 @@ export function BlockCard({ log, verification, expanded = false, onExpandedChang
               ) : null}
             </form>
           </div>
+
+          {log.signature && (
+            <div className="detail-card form-panel">
+              <div className="detail-head">
+                <div>
+                  <h4>Verify Digital Signature</h4>
+                  <p className="support-copy">Check if the block's ECDSA signature is valid and hasn't been tampered with.</p>
+                </div>
+                <ShieldCheck size={18} />
+              </div>
+              <button
+                className="secondary-button"
+                type="button"
+                disabled={verifySigMutation.isPending}
+                onClick={() => verifySigMutation.mutate()}
+              >
+                {verifySigMutation.isPending ? "Verifying..." : "Verify Signature"}
+              </button>
+              
+              {signatureStatus && (
+                <div className={`inline-feedback tone-${signatureStatus.valid ? 'success' : 'danger'}`} style={{ marginTop: "1rem" }}>
+                  <strong>{signatureStatus.valid ? "Signature is Valid" : "Signature Verification Failed"}</strong>
+                  <p>{signatureStatus.message}</p>
+                </div>
+              )}
+              {verifySigMutation.error && (
+                <div className="inline-feedback tone-danger" style={{ marginTop: "1rem" }}>
+                  {verifySigMutation.error.response?.data?.detail || "Verification failed."}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Cryptographic Proofs Panel */}
+          <MerkleProofPanel log={log} />
         </div>
       ) : null}
     </motion.article>

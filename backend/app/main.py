@@ -13,14 +13,20 @@ if __package__ in {None, ""}:
         sys.path.insert(0, backend_dir_str)
 
 from app.core.config import settings
-from app.routers import chain, comparison, health, logs
+from app.routers import alerts, auth, chain, comparison, crypto, health, logs
 from app.services.crypto_self_check import run_crypto_self_check
+from app.services.db import init_db
 from app.services.file_storage import ensure_storage_files
 from app.services.log_service import seed_demo_data
+from app.core.limiter import limiter
+from slowapi.errors import RateLimitExceeded
+from slowapi import _rate_limit_exceeded_handler
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    # Initialize database
+    init_db()
     ensure_storage_files()
     run_crypto_self_check()
     if settings.seed_demo_data:
@@ -46,7 +52,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 app.include_router(health.router, prefix=settings.api_prefix, tags=["Health"])
+app.include_router(auth.router, prefix=settings.api_prefix, tags=["Authentication"])
 app.include_router(logs.router, prefix=settings.api_prefix, tags=["Logs"])
 app.include_router(chain.router, prefix=settings.api_prefix, tags=["Chain"])
 app.include_router(comparison.router, prefix=settings.api_prefix, tags=["Comparison"])
+app.include_router(crypto.router, prefix=settings.api_prefix, tags=["Cryptography"])
+app.include_router(alerts.router, prefix=settings.api_prefix, tags=["Alerts"])

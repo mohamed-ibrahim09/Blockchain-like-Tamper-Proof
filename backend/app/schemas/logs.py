@@ -11,6 +11,7 @@ class LogCreateRequest(BaseModel):
     original_message: str = Field(min_length=1)
     algorithm: AlgorithmName
     key: str | None = None
+    # User fields will be populated from JWT token, not from request body
 
     @model_validator(mode="after")
     def validate_keys(self) -> "LogCreateRequest":
@@ -45,6 +46,11 @@ class LogEntryResponse(BaseModel):
     tamper_note: str | None
     created_at: datetime
     updated_at: datetime
+    # User attribution fields
+    created_by_user_id: int | None = None
+    created_by_username: str | None = None
+    # Digital signature
+    signature: dict[str, Any] | None = None
 
 
 class LogListResponse(BaseModel):
