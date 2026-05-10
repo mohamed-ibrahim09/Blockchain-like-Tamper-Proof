@@ -82,8 +82,8 @@ class CryptoService:
                     except ValueError:
                         pass
                 encrypted = module.rsa_algorithm(message, p, q)
-                if encrypted == "[ERROR]":
-                    raise CryptoServiceError("RSA encryption failed.")
+                if isinstance(encrypted, str) and encrypted.startswith("[ERROR"):
+                    raise CryptoServiceError(f"RSA encryption failed: {encrypted}")
                 return encrypted, {
                     "key": f"{p},{q}",
                     "preprocessing": f"Repo-local RSA processing from rsa.py using primes {p} and {q}.",
@@ -112,8 +112,8 @@ class CryptoService:
                     except ValueError:
                         pass
                 decrypted = module.rsa_decrypt(encrypted_message, p, q)
-                if decrypted == "[ERROR]":
-                    raise CryptoServiceError("RSA decryption failed.")
+                if isinstance(decrypted, str) and decrypted.startswith("[ERROR"):
+                    raise CryptoServiceError(f"RSA decryption failed: {decrypted}")
                 return decrypted
             raise CryptoServiceError(f"Unsupported algorithm: {algorithm}")
         except (KeyError, ValueError, FileNotFoundError) as exc:
@@ -126,8 +126,8 @@ class CryptoService:
             raise CryptoServiceError("The repo-local hybrid module does not expose a supported encrypt function.")
 
         encrypted_value = encrypt_fn(message)
-        if encrypted_value == "[ERROR]":
-            raise CryptoServiceError("Hybrid encryption failed.")
+        if isinstance(encrypted_value, str) and encrypted_value.startswith("[ERROR"):
+            raise CryptoServiceError(f"Hybrid encryption failed: {encrypted_value}")
 
         steps_metadata = [
             {
@@ -165,8 +165,8 @@ class CryptoService:
             raise CryptoServiceError("The repo-local hybrid module does not expose a supported decrypt function.")
 
         decrypted_value = decrypt_fn(encrypted_message)
-        if decrypted_value == "[ERROR]":
-            raise CryptoServiceError("Hybrid decryption failed.")
+        if isinstance(decrypted_value, str) and decrypted_value.startswith("[ERROR"):
+            raise CryptoServiceError(f"Hybrid decryption failed: {decrypted_value}")
         return decrypted_value
 
 

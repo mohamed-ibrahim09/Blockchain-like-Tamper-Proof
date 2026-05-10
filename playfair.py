@@ -91,13 +91,30 @@ def decrypt(text: str, key: str):
 
 def playfair_algorithm(text: str, key: str = DEFAULT_PLAYFAIR_KEY):
     try:
-        return encrypt(text, key)
+        cleaned = re.sub(r"[^A-Z]", "", text.upper()).replace("J", "I")
+        original_alpha_len = len(cleaned)
+        cipher = encrypt(text, key)
+        return f"{cipher}|{original_alpha_len}"
     except (TypeError, ValueError):
         return "[ERROR]"
 
 
 def playfair_decrypt(text: str, key: str = DEFAULT_PLAYFAIR_KEY):
     try:
-        return decrypt(text, key)
+        # Support "CIPHERTEXT|original_alpha_len" format
+        if "|" in text:
+            cipher_part, length_suffix = text.rsplit("|", 1)
+            original_alpha_len = int(length_suffix)
+        else:
+            cipher_part = text
+            original_alpha_len = None
+
+        result = decrypt(cipher_part, key)
+
+        # Strip padding X's that were added during bigram preparation
+        if original_alpha_len is not None and len(result) > original_alpha_len:
+            result = result[:original_alpha_len]
+
+        return result
     except (TypeError, ValueError):
         return "[ERROR]"
