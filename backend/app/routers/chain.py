@@ -15,6 +15,19 @@ def verify_log_chain(
     return verify_chain()
 
 
+@router.get("/status", response_model=ChainVerificationResponse)
+def get_chain_status(
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> ChainVerificationResponse:
+    """Lightweight GET endpoint for the frontend to poll chain health.
+
+    Re-runs full verification on every call so any external edit to
+    log_chain.jsonl is reflected immediately without a page refresh.
+    Does NOT write an additional warning record (the file-watcher handles that).
+    """
+    return verify_chain(write_warning=False)
+
+
 @router.get("/warnings", response_model=WarningListResponse)
 def list_chain_warnings(
     current_user: dict[str, Any] = Depends(get_current_user),

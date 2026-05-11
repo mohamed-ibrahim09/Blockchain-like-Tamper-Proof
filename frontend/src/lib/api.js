@@ -75,6 +75,11 @@ export async function fetchChainWarnings() {
   return optionalGet("/chain/warnings", { items: [] });
 }
 
+export async function fetchChainStatus() {
+  const { data } = await apiClient.get("/chain/status");
+  return data;
+}
+
 export async function resetChainData() {
   const { data } = await apiClient.post("/chain/reset");
   return data;

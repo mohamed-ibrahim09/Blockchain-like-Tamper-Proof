@@ -6,8 +6,6 @@ Provides endpoints for:
 - Key rotation and management
 """
 
-import hashlib
-import json
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -40,6 +38,7 @@ from app.services.log_service import get_log_or_404, get_logs, serialize_log
 from app.services.merkle import (
     build_merkle_tree_from_logs,
     format_proof_for_api,
+    hash_data,
     verify_chain_with_merkle,
 )
 
@@ -126,6 +125,8 @@ def get_merkle_tree_info(
         leaf_count=result["leaf_count"],
         valid=result["valid"],
         message=result["message"],
+        leaf_hashes=result.get("leaf_hashes", []),
+        log_ids=result.get("log_ids", []),
     )
 
 
@@ -206,20 +207,22 @@ def verify_merkle_proof(
         "created_at": log.get("created_at"),
     }
     
-    # Verify
+    # Verify using the tree's own method
     valid = tree.verify_proof(leaf_data, proof)
-    
-    # Compute what the root should be
-    current_hash = tree.leaves[0]._hash_leaf(leaf_data, 0).hash if tree.leaves else ""
+
+    # Ensure the proof's root hash matches the current tree's root hash
+    if valid and payload.root_hash != tree.get_root_hash():
+        valid = False
+
+    # Compute the root from the proof path for the response
+    current_hash = hash_data(leaf_data)
     for sibling in proof["siblings"]:
         if sibling["side"] == "left":
             combined = sibling["hash"] + current_hash
         else:
             combined = current_hash + sibling["hash"]
-        current_hash = hashlib.sha256(
-            json.dumps(combined, sort_keys=True, separators=(',', ':')).encode('utf-8')
-        ).hexdigest()
-    
+        current_hash = hash_data(combined)
+
     return MerkleProofVerificationResponse(
         valid=valid,
         log_id=payload.log_id,

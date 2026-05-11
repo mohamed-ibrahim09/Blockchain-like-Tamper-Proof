@@ -6,7 +6,7 @@ import { MetricCard } from "../components/ui/MetricCard";
 import { SectionCard } from "../components/ui/SectionCard";
 import { StatusPill } from "../components/ui/StatusPill";
 import { WarningHistoryList } from "../components/ui/WarningHistoryList";
-import { fetchChainWarnings, verifyChain } from "../lib/api";
+import { fetchChainWarnings, verifyChain, fetchChainStatus } from "../lib/api";
 import { queryClient } from "../lib/queryClient";
 import {
   formatBlockIdList,
@@ -22,15 +22,24 @@ import {
 } from "../lib/formatters";
 
 export function VerificationPage() {
-  const { data, isLoading } = useQuery({ queryKey: ["verification"], queryFn: verifyChain });
-  const { data: warningsData } = useQuery({ queryKey: ["warnings"], queryFn: fetchChainWarnings });
+  const { data, isLoading } = useQuery({
+    queryKey: ["chain-status"],
+    queryFn: fetchChainStatus,
+    refetchInterval: 5000,
+  });
+  const { data: warningsData } = useQuery({
+    queryKey: ["warnings"],
+    queryFn: fetchChainWarnings,
+    refetchInterval: 5000,
+  });
   const mutation = useMutation({
     mutationFn: verifyChain,
     onSuccess: async (result) => {
-      queryClient.setQueryData(["verification"], result);
+      queryClient.setQueryData(["chain-status"], result);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["logs"] }),
         queryClient.invalidateQueries({ queryKey: ["warnings"] }),
+        queryClient.invalidateQueries({ queryKey: ["chain-status"] }),
       ]);
     },
   });

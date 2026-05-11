@@ -8,7 +8,7 @@ import { MetricCard } from "../components/ui/MetricCard";
 import { SectionCard } from "../components/ui/SectionCard";
 import { StatusPill } from "../components/ui/StatusPill";
 import { WarningHistoryList } from "../components/ui/WarningHistoryList";
-import { fetchChainWarnings, fetchComparisonMetrics, fetchLogs, verifyChain } from "../lib/api";
+import { fetchChainWarnings, fetchComparisonMetrics, fetchLogs, fetchChainStatus } from "../lib/api";
 import {
   formatBlockIdList,
   getAffectedBlockIds,
@@ -20,10 +20,22 @@ import {
 } from "../lib/formatters";
 
 export function DashboardPage() {
-  const { data: logsData } = useQuery({ queryKey: ["logs"], queryFn: fetchLogs });
-  const { data: verificationData } = useQuery({ queryKey: ["verification"], queryFn: verifyChain });
+  const { data: logsData } = useQuery({
+    queryKey: ["logs"],
+    queryFn: fetchLogs,
+    refetchInterval: 5000,
+  });
+  const { data: verificationData } = useQuery({
+    queryKey: ["chain-status"],
+    queryFn: fetchChainStatus,
+    refetchInterval: 5000,   // re-checks chain health every 5 s
+  });
   const { data: comparisonData } = useQuery({ queryKey: ["comparison"], queryFn: fetchComparisonMetrics });
-  const { data: warningsData } = useQuery({ queryKey: ["warnings"], queryFn: fetchChainWarnings });
+  const { data: warningsData } = useQuery({
+    queryKey: ["warnings"],
+    queryFn: fetchChainWarnings,
+    refetchInterval: 5000,
+  });
 
   const logs = logsData?.items || [];
   const verificationResults = getVerificationResults(verificationData);

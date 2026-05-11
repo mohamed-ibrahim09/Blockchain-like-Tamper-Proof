@@ -51,12 +51,13 @@ def serialize_log(record: dict[str, Any]) -> dict[str, Any]:
 
 
 def get_logs() -> list[dict[str, Any]]:
-    return read_log_records()
+    """Return all non-sentinel log records."""
+    return [r for r in read_log_records() if not r.get("is_sentinel")]
 
 
 def get_log_or_404(log_id: int) -> dict[str, Any] | None:
     for record in read_log_records():
-        if int(record["id"]) == log_id:
+        if int(record["id"]) == log_id and not record.get("is_sentinel"):
             return record
     return None
 
@@ -71,7 +72,8 @@ def create_log(
     created_by_username: str | None = None,
 ) -> dict[str, Any]:
     records = read_log_records()
-    previous_record = records[-1] if records else None
+    real_records = [r for r in records if not r.get("is_sentinel")]
+    previous_record = real_records[-1] if real_records else None
     previous_hash = previous_record["current_hash"] if previous_record else GENESIS_PREVIOUS_HASH
     created_at = _now()
 
@@ -105,7 +107,7 @@ def create_log(
     )
 
     record = {
-        "id": int(records[-1]["id"]) + 1 if records else 1,
+        "id": int(real_records[-1]["id"]) + 1 if real_records else 1,
         "original_message": original_message,
         "encrypted_message": encryption.encrypted_message,
         "algorithm": algorithm,
@@ -123,13 +125,14 @@ def create_log(
         "created_by_user_id": created_by_user_id,
         "created_by_username": created_by_username,
     }
-    
+
     # Sign the block with ECDSA
     ensure_signing_key_exists()
     signature_data = sign_block(record)
     record["signature"] = signature_data
-    
+
     append_log_record(record)
+    _update_sentinel()
     verify_chain(write_warning=True)
     return record
 
@@ -187,8 +190,65 @@ def tamper_log(*, log: dict[str, Any], field: str, new_value: str, note: str | N
         raise ValueError("Log entry not found.")
 
     write_log_records(records)
+    _update_sentinel()
     verify_chain(write_warning=True)
     return mutated
+
+
+def _update_sentinel() -> None:
+    """Remove any existing sentinel and append a fresh one after the last real block.
+
+    The sentinel is a hidden block whose previous_hash anchors to the last real
+    block's current_hash.  If someone deletes the last real block, the sentinel's
+    previous_hash will no longer match any block, and chain verification will
+    detect the break.
+    """
+    records = read_log_records()
+
+    # Remove existing sentinel(s)
+    records = [r for r in records if not r.get("is_sentinel")]
+
+    if not records:
+        return
+
+    last_record = records[-1]
+    previous_hash = last_record["current_hash"]
+    created_at = _now()
+
+    sentinel_id = int(last_record["id"]) + 1
+
+    sentinel = {
+        "id": sentinel_id,
+        "original_message": "__SENTINEL__",
+        "encrypted_message": "__SENTINEL__",
+        "algorithm": "sentinel",
+        "key_metadata": {"mode": "sentinel", "purpose": "chain-anchor"},
+        "previous_hash": previous_hash,
+        "current_hash": sha256_hash(
+            canonicalize_hash_payload(
+                encrypted_message="__SENTINEL__",
+                algorithm="sentinel",
+                key_metadata={"mode": "sentinel", "purpose": "chain-anchor"},
+                previous_hash=previous_hash,
+                created_at=created_at,
+                hybrid_steps=[],
+            )
+        ),
+        "hybrid_steps": [],
+        "encryption_time_ms": 0,
+        "decryption_time_ms": 0,
+        "output_length": 0,
+        "tampered": False,
+        "tamper_note": None,
+        "created_at": created_at.isoformat(),
+        "updated_at": created_at.isoformat(),
+        "created_by_user_id": None,
+        "created_by_username": None,
+        "is_sentinel": True,
+    }
+
+    records.append(sentinel)
+    write_log_records(records)
 
 
 def _append_warning_if_needed(response: ChainVerificationResponse) -> bool:
@@ -267,9 +327,12 @@ def verify_chain(*, write_warning: bool = True) -> ChainVerificationResponse:
             results=[],
         )
 
+    # Build a sentinel lookup for quick checks
+    sentinel_ids: set[int] = {int(r["id"]) for r in records if r.get("is_sentinel")}
+
     previous_stored_hash = GENESIS_PREVIOUS_HASH
     previous_recalculated_hash = GENESIS_PREVIOUS_HASH
-    results: list[VerificationBlockResult] = []
+    all_results: list[VerificationBlockResult] = []
     first_broken_block_id: int | None = None
 
     for index, record in enumerate(records):
@@ -319,7 +382,7 @@ def verify_chain(*, write_warning: bool = True) -> ChainVerificationResponse:
                 first_broken_block_id = int(record["id"])
             reasons.append("This block is downstream from an earlier broken block.")
 
-        results.append(
+        all_results.append(
             VerificationBlockResult(
                 id=int(record["id"]),
                 algorithm=record["algorithm"],
@@ -337,19 +400,25 @@ def verify_chain(*, write_warning: bool = True) -> ChainVerificationResponse:
         previous_stored_hash = record["current_hash"]
         previous_recalculated_hash = recalculated_hash
 
+    # Sentinel blocks verify the chain anchor but must NOT appear in the
+    # user-facing results or counts — they are invisible implementation details.
+    public_results = [r for r in all_results if r.id not in sentinel_ids]
+
     response = ChainVerificationResponse(
-        is_valid=all(result.status == "valid" for result in results),
+        # is_valid uses ALL results (including sentinel) so chain breaks are caught
+        is_valid=all(r.status == "valid" for r in all_results),
         verified_at=_now(),
-        total_blocks=len(results),
-        valid_blocks=sum(result.status == "valid" for result in results),
-        tampered_blocks=sum(result.status == "tampered" for result in results),
-        affected_blocks=sum(result.status == "affected" for result in results),
-        changed_block_ids=[result.id for result in results if result.status == "tampered"],
-        affected_block_ids=[result.id for result in results if result.status == "affected"],
-        first_broken_block_id=first_broken_block_id,
+        # Public metrics only count real (non-sentinel) blocks
+        total_blocks=len(public_results),
+        valid_blocks=sum(r.status == "valid" for r in public_results),
+        tampered_blocks=sum(r.status == "tampered" for r in public_results),
+        affected_blocks=sum(r.status == "affected" for r in public_results),
+        changed_block_ids=[r.id for r in public_results if r.status == "tampered"],
+        affected_block_ids=[r.id for r in public_results if r.status == "affected"],
+        first_broken_block_id=first_broken_block_id if first_broken_block_id not in sentinel_ids else None,
         warning_written=False,
         warning_file_path=str(settings.tamper_warning_path),
-        results=results,
+        results=public_results,
     )
     warning_written = _append_warning_if_needed(response) if write_warning else False
     return response.model_copy(update={"warning_written": warning_written})

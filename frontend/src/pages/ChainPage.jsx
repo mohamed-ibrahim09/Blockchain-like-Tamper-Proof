@@ -5,7 +5,7 @@ import { RotateCcw, TriangleAlert } from "lucide-react";
 import { ChainTimeline } from "../components/chain/ChainTimeline";
 import { AlertBanner } from "../components/ui/AlertBanner";
 import { SectionCard } from "../components/ui/SectionCard";
-import { fetchChainWarnings, fetchLogs, resetChainData, verifyChain } from "../lib/api";
+import { fetchChainWarnings, fetchLogs, resetChainData, verifyChain, fetchChainStatus } from "../lib/api";
 import {
   formatBlockIdList,
   getAffectedBlockIds,
@@ -19,9 +19,21 @@ export function ChainPage() {
   const queryClient = useQueryClient();
   const [showResetModal, setShowResetModal] = useState(false);
   const [resetFeedback, setResetFeedback] = useState(null);
-  const { data: logsData } = useQuery({ queryKey: ["logs"], queryFn: fetchLogs });
-  const { data: verificationData } = useQuery({ queryKey: ["verification"], queryFn: verifyChain });
-  const { data: warningsData } = useQuery({ queryKey: ["warnings"], queryFn: fetchChainWarnings });
+  const { data: logsData } = useQuery({
+    queryKey: ["logs"],
+    queryFn: fetchLogs,
+    refetchInterval: 5000,
+  });
+  const { data: verificationData } = useQuery({
+    queryKey: ["chain-status"],
+    queryFn: fetchChainStatus,
+    refetchInterval: 5000,
+  });
+  const { data: warningsData } = useQuery({
+    queryKey: ["warnings"],
+    queryFn: fetchChainWarnings,
+    refetchInterval: 5000,
+  });
   const resetMutation = useMutation({
     mutationFn: resetChainData,
     onSuccess: async (data) => {
@@ -29,7 +41,7 @@ export function ChainPage() {
       setShowResetModal(false);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["logs"] }),
-        queryClient.invalidateQueries({ queryKey: ["verification"] }),
+        queryClient.invalidateQueries({ queryKey: ["chain-status"] }),
         queryClient.invalidateQueries({ queryKey: ["warnings"] }),
         queryClient.invalidateQueries({ queryKey: ["comparison"] }),
       ]);

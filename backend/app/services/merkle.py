@@ -314,6 +314,8 @@ def verify_chain_with_merkle(logs: list[dict[str, Any]]) -> dict[str, Any]:
             "message": "Empty chain is valid",
             "root_hash": None,
             "leaf_count": 0,
+            "leaf_hashes": [],
+            "log_ids": [],
         }
     
     tree = build_merkle_tree_from_logs(logs)
@@ -323,6 +325,8 @@ def verify_chain_with_merkle(logs: list[dict[str, Any]]) -> dict[str, Any]:
         "message": f"Merkle tree built successfully with {tree.leaf_count} leaves",
         "root_hash": tree.get_root_hash(),
         "leaf_count": tree.leaf_count,
+        "leaf_hashes": [leaf.hash for leaf in tree.leaves],
+        "log_ids": [log.get("id") for log in logs],
     }
 
 

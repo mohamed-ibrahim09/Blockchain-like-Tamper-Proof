@@ -4,7 +4,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field, model_validator
 
 
-AlgorithmName = Literal["rsa", "playfair", "vigenere", "hybrid"]
+AlgorithmName = Literal["rsa", "playfair", "vigenere", "hybrid", "sentinel"]
 
 
 class LogCreateRequest(BaseModel):

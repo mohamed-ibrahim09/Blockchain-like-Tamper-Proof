@@ -60,6 +60,8 @@ class MerkleTreeInfoResponse(BaseModel):
     leaf_count: int
     valid: bool
     message: str
+    leaf_hashes: list[str] = []
+    log_ids: list[int] = []
 
 
 class MerkleProofVerificationRequest(BaseModel):

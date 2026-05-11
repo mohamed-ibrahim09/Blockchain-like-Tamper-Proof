@@ -205,8 +205,9 @@ export function MerkleTreeVisualizer() {
 
   const handleLeafClick = useCallback((leafIndex) => {
     setSelectedLeaf(leafIndex);
-    loadProof(leafIndex + 1);
-  }, []);
+    const logId = treeInfo?.log_ids?.[leafIndex] || leafIndex + 1;
+    loadProof(logId);
+  }, [treeInfo]);
 
   const handleGenerateProof = async () => {
     if (!proofBlockId.trim()) return;
@@ -226,7 +227,7 @@ export function MerkleTreeVisualizer() {
   const buildTree = () => {
     const leafCount = treeInfo?.leaf_count || 4;
     const leaves = Array.from({ length: leafCount }, (_, i) => ({
-      hash: treeInfo?.leaf_hashes?.[i] || `leaf_${i}_hash`,
+      hash: treeInfo?.leaf_hashes?.[i] || `Log #${i + 1} Hash`,
       index: i,
     }));
 
@@ -257,17 +258,22 @@ export function MerkleTreeVisualizer() {
   const { levels, root, leafLevel } = buildTree();
   const totalLevels = levels.length;
 
-  // Check if a node is in the proof path
-  const isInProofPath = (level, index) => {
+  // Check if a node is in the proof path (the leaf and its ancestors)
+  const isInProofPath = (levelIdx, nodeIdx) => {
     if (!proofData || selectedLeaf === null) return false;
-    return level === leafLevel && index === selectedLeaf;
+    const d = leafLevel - levelIdx;
+    const targetIdx = Math.floor(selectedLeaf / Math.pow(2, d));
+    return nodeIdx === targetIdx;
   };
 
-  // Check if a node is a sibling in the proof
-  const isSibling = (level, index) => {
+  // Check if a node is a sibling needed for the proof
+  const isSibling = (levelIdx, nodeIdx) => {
     if (!proofData || selectedLeaf === null) return false;
-    const siblingIndex = selectedLeaf % 2 === 0 ? selectedLeaf + 1 : selectedLeaf - 1;
-    return level === leafLevel && index === siblingIndex && index < (treeInfo?.leaf_count || 4);
+    if (levelIdx === 0) return false; // Root has no sibling
+    const d = leafLevel - levelIdx;
+    const ancestorIdx = Math.floor(selectedLeaf / Math.pow(2, d));
+    const siblingIdx = ancestorIdx % 2 === 0 ? ancestorIdx + 1 : ancestorIdx - 1;
+    return nodeIdx === siblingIdx && nodeIdx < levels[levelIdx].length;
   };
 
   if (loading) {
@@ -583,7 +589,7 @@ export function MerkleTreeVisualizer() {
           }}
         >
           <h4 style={{ margin: "0 0 1rem", fontSize: "0.95rem", fontWeight: 600 }}>
-            Proof for Leaf #{selectedLeaf + 1}
+            Proof for Log #{treeInfo?.log_ids?.[selectedLeaf] || selectedLeaf + 1}
           </h4>
           <div style={{ fontSize: "0.8rem", fontFamily: '"JetBrains Mono", ui-monospace, monospace', marginBottom: "1rem" }}>
             <div><strong>Leaf Hash:</strong> {shortenHash(proofData.leaf_hash, 20)}</div>

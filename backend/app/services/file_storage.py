@@ -20,7 +20,9 @@ def ensure_storage_files() -> None:
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
     ensure_storage_files()
     items: list[dict[str, Any]] = []
-    with path.open("r", encoding="utf-8") as handle:
+    # utf-8-sig strips the UTF-8 BOM that Windows editors (VS Code, Notepad)
+    # sometimes write when you save a file, preventing JSON parse errors.
+    with path.open("r", encoding="utf-8-sig") as handle:
         for line_number, raw_line in enumerate(handle, start=1):
             line = raw_line.strip()
             if not line:
