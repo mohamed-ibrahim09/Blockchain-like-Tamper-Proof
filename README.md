@@ -390,10 +390,8 @@ There is no mining, no peer-to-peer replication, no consensus protocol, no walle
     <td align="center" width="200">
       <strong>Mohamed Elhadad</strong><br/>
       <sub>
-        🎨 Playfair Cipher<br/>
-        ⚛️ Frontend — React/Vite UI, chain viewer, crypto admin<br/>
-        ⚙️ Backend — FastAPI routes, encryption service, ECDSA signing, Merkle tree<br/>
-        🚀 Deployment — Vercel frontend, uvicorn backend, environment configuration
+       🎨 Playfair Cipher<br/>
+        ⚛️ Frontend &amp; Backend &amp; Deployment 
       </sub>
     </td>
     <td align="center" width="200">

@@ -12,14 +12,12 @@ def _is_error(value: str) -> bool:
 def hybrid_encrypt(
     message: str,
     vig_key: str = DEFAULT_VIGENERE_KEY,
-    rsa_pub_key=None,
     play_k: str = DEFAULT_PLAYFAIR_KEY,
 ) -> str:
     """
     Encrypt using pipeline: Playfair → Vigenere → RSA.
     Returns the encrypted string or '[ERROR: ...]' with a descriptive message.
     """
-    del rsa_pub_key  # unused — RSA uses internally generated keypair
 
     if not message or not message.strip():
         return "[ERROR: Message is empty.]"
@@ -56,14 +54,12 @@ def hybrid_encrypt(
 def hybrid_decrypt(
     cipher: str,
     vig_key: str = DEFAULT_VIGENERE_KEY,
-    rsa_priv_key=None,
     play_k: str = DEFAULT_PLAYFAIR_KEY,
 ) -> str:
     """
     Decrypt using reverse pipeline: RSA → Vigenere → Playfair.
     Returns the original plaintext or '[ERROR: ...]'.
     """
-    del rsa_priv_key  # unused
 
     if not cipher or not cipher.strip():
         return "[ERROR: Ciphertext is empty.]"
